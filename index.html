@@ -40,6 +40,7 @@ a{color:var(--accent)}
 .tabs a{flex:1 0 auto;text-align:center;padding:9px 6px;font-weight:600;font-size:13.5px;color:var(--muted);text-decoration:none;
   border-bottom:3px solid transparent;white-space:nowrap}
 .tabs a.on{color:var(--ink);border-bottom-color:var(--accent)}
+@media (max-width:480px){.tabs{flex-wrap:wrap}}   /* seven tabs: two rows on a phone, so Draft is never hidden off the edge */
 main{padding-top:14px}
 h2{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:.4px;margin:6px 0 2px}
 .sub{color:var(--muted);font-size:12.5px;margin:0 0 12px}
@@ -120,7 +121,7 @@ tr.grp td{background:var(--surface-2);color:var(--muted);font-size:11px;text-tra
 .lufoot{display:flex;justify-content:space-between;gap:8px 14px;padding:8px 12px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);flex-wrap:wrap}
 .lufoot b{color:var(--ink)}
 .tier{display:inline-block;min-width:16px;padding:1px 4px;border-radius:5px;background:var(--surface-2);color:var(--accent);font-size:10px;font-weight:700;text-align:center;margin-left:4px;vertical-align:1px}
-tr.pick{cursor:pointer}
+tr.drow{cursor:pointer}
 tr.taken td{color:var(--muted);text-decoration:line-through}
 tr.taken td .tm2,tr.taken td .tier{text-decoration:line-through}
 tr.mine td{color:var(--good)}
@@ -302,7 +303,8 @@ function renderSchedule(){
 /* dfsHelpers:start */
 const dkSlot=p=>{const s=String(p==null?"":p).toUpperCase().split("/")[0].trim(); return s==="G"?"G":s==="D"?"D":s==="C"?"C":(s==="LW"||s==="RW"||s==="W")?"W":"";};
 const nextMark=m=>m==="taken"?"mine":m==="mine"?"":"taken";
-const money0=x=>x==null?"":"$"+Math.round(Number(x)).toLocaleString("en-US");
+const fmt0=x=>x==null||isNaN(Number(x))?"":String(Math.round(Number(x))).replace(/\B(?=(\d{3})+(?!\d))/g,",");   /* no locale data needed */
+const money0=x=>x==null||isNaN(Number(x))?"":"$"+fmt0(x);
 /* dfsHelpers:end */
 const DCOLS=[{k:"player",label:"Player",num:false},{k:"salary",label:"Sal",num:true,title:"DraftKings salary"},
   {k:"proj",label:"Proj",num:true,title:"projected DK points (35)"},{k:"value",label:"Val",num:true,title:"projected points per $1,000 of salary"},
@@ -315,6 +317,7 @@ function renderDFS(){
   if(!d||!d.players||!d.players.length){
     V.innerHTML=h+`<p class="sub">${dt}</p><div class="empty">No DFS projections for today.<small>Export tonight's contest salaries from the DraftKings lobby to data/daily/DKSalaries.csv, then run <b>run_dfs()</b> in RStudio after run_predict().</small></div>`;return;}
   const rows=d.players.map(r=>({...r,slot:dkSlot(r.dk_pos||r.pos)})).filter(r=>r.slot&&(!d.salaries||r.salary!=null));
+  const awayTeams=new Set((D.games||[]).map(g=>g.away_team)), vsAt=(t,o)=>o?(awayTeams.has(t)?" @ ":" vs ")+esc(o):"";
   h+=`<p class="sub">${dt} &middot; ${rows.length} players${d.salaries?"":" &middot; <b>no salaries</b> (projections only)"}${d.sim?"":" &middot; no simulation yet (ceiling / own blank)"} &middot; built ${esc(d.built||"")}</p>`;
   const has=k=>!!(k==="cash"?(d.cash&&d.cash.length):(d.gpp&&d.gpp.length));
   if(!has(dst.lu)) dst.lu=has("cash")?"cash":has("gpp")?"gpp":dst.lu;
@@ -326,7 +329,7 @@ function renderDFS(){
   if(!cur.length){ h+=`<div class="card"><div class="empty">${dst.lu==="gpp"?"No tournament lineups yet: run_dfs() builds them (37 + 38).":"No cash lineup yet: run_dfs() builds it (36)."}</div></div>`; }
   else{
     const sal=cur.reduce((s,x)=>s+(x.salary||0),0), pr=cur.reduce((s,x)=>s+(x.proj||0),0), g=cur[0];
-    h+=`<div class="card">${cur.map(x=>`<div class="lurow"><span class="sl">${esc(x.slot)}</span><span>${esc(x.player)}<span class="tm2">${esc(x.team)}${x.opp?" vs "+esc(x.opp):""}</span></span><span class="sal">${money0(x.salary)}</span><span class="tnum">${num(x.proj,1)}</span></div>`).join("")}
+    h+=`<div class="card">${cur.map(x=>`<div class="lurow"><span class="sl">${esc(x.slot)}</span><span>${esc(x.player)}<span class="tm2">${esc(x.team)}${vsAt(x.team,x.opp)}</span></span><span class="sal">${money0(x.salary)}</span><span class="tnum">${num(x.proj,1)}</span></div>`).join("")}
       <div class="lufoot"><span>${money0(sal)} of $50,000</span><span><b>${num(pr,1)}</b> proj. pts</span>${dst.lu==="gpp"&&g.p_beat_field!=null?`<span>sim mean <b>${num(g.lineup_sim_mean,1)}</b> &middot; ceiling <b>${num(g.lineup_sim_ceiling,1)}</b> &middot; beats the field <b>${pct(g.p_beat_field)}</b></span>`:""}</div></div>`;
     h+=dst.lu==="gpp"
       ?`<p class="note">Tournament lineups come from the joint simulation: stacks get credit for scoring together, and the portfolio maximises the chance that at least one entry wins. Large fields are close to a lottery; cash and small fields are where the projections earn. The DK entry file is dk_gpp_upload.csv in today's folder.</p>`
@@ -335,8 +338,8 @@ function renderDFS(){
   const POS=["C","W","D","G"], st=dst.st;
   h+=`<h2 style="margin-top:14px">Top picks</h2><div class="ctl">${["All",...POS].map(p=>`<button data-pos="${p}" class="${dst.pos===p?"on":""}">${p}</button>`).join("")}<button id="dall" class="${dst.all?"on":""}">${dst.all?"top 8 only":"show all"}</button></div>`;
   const cell=(r,c)=>{const v=r[c.k];
-    if(c.k==="player") return `<td class="l"><div class="tm">${logo(r.team,"sm")}<span>${esc(r.player)}<span class="tm2">${esc(r.slot)} &middot; ${esc(r.team)}${r.opp?" vs "+esc(r.opp):""}</span></span></div></td>`;
-    if(c.k==="salary") return `<td class="tnum">${v==null?"":Math.round(v).toLocaleString("en-US")}</td>`;
+    if(c.k==="player") return `<td class="l"><div class="tm">${logo(r.team,"sm")}<span>${esc(r.player)}<span class="tm2">${esc(r.slot)} &middot; ${esc(r.team)}${vsAt(r.team,r.opp)}</span></span></div></td>`;
+    if(c.k==="salary") return `<td class="tnum">${fmt0(v)}</td>`;
     return `<td class="tnum">${num(v,c.k==="value"||c.k==="own"?2:1)}</td>`;};
   const body=POS.filter(p=>dst.pos==="All"||dst.pos===p).map(p=>{
     let s=sortRows(rows.filter(r=>r.slot===p),DCOLS,st); if(!dst.all) s=s.slice(0,8);
@@ -384,7 +387,7 @@ function renderDraft(){
   document.getElementById("dreset").onclick=()=>{if(confirm("Clear every taken / mine mark?")){marks={};saveMarks(marks);drawDraft();}};
   const rowCls=r=>marks[r.key]==="taken"?"taken":marks[r.key]==="mine"?"mine":"";
   const toggle=tr=>{const k=tr.dataset.key, m=nextMark(marks[k]||""); if(m) marks[k]=m; else delete marks[k]; saveMarks(marks);
-    document.querySelectorAll("tr.pick").forEach(x=>{if(x.dataset.key===k){x.classList.remove("taken","mine"); if(m) x.classList.add(m);}}); drawSummary();};
+    document.querySelectorAll("tr.drow").forEach(x=>{if(x.dataset.key===k){x.classList.remove("taken","mine"); if(m) x.classList.add(m);}}); drawSummary();};
   function drawSummary(){
     const open=g=>all.find(r=>r.grp===g&&!marks[r.key]), nm=g=>{const o=open(g); return o?esc(o.name):"&ndash;";};
     const mine=all.filter(r=>marks[r.key]==="mine"), cnt=g=>mine.filter(r=>r.grp===g).length;
@@ -394,11 +397,11 @@ function renderDraft(){
     const q=fold(drst.q.trim());
     const flt=all.filter(r=>(drst.pos==="All"||r.grp===drst.pos)&&(!q||fold(r.name).includes(q)||fold(r.team).includes(q)));
     document.getElementById("dtw").innerHTML=`<table><thead><tr><th>#</th><th class="l">Player</th><th>Pts</th><th class="hide-sm">Floor&ndash;ceil</th><th>VORP</th></tr></thead><tbody>${
-      flt.map((r,i)=>`<tr class="pick ${i%2?"band":""} ${rowCls(r)}" data-key="${esc(r.key)}"><td class="tnum rk">${r.n}${r.tier!=null?`<span class="tier">${esc(r.tier)}</span>`:""}</td><td class="l"><div class="tm">${logo(r.team,"sm")}<span>${esc(r.name)}<span class="tm2">${esc(r.pos)} &middot; ${esc(r.team)}${r.note?" &middot; "+esc(r.note):""}</span></span></div></td><td class="tnum">${num(r.pts,0)}</td><td class="tnum hide-sm">${r.floor==null?"":num(r.floor,0)+"&ndash;"+num(r.ceil,0)}</td><td class="tnum">${num(r.vorp,0)}</td></tr>`).join("")}</tbody></table>`;
+      flt.map((r,i)=>`<tr class="drow ${i%2?"band":""} ${rowCls(r)}" data-key="${esc(r.key)}"><td class="tnum rk">${r.n}${r.tier!=null?`<span class="tier">${esc(r.tier)}</span>`:""}</td><td class="l"><div class="tm">${logo(r.team,"sm")}<span>${esc(r.name)}<span class="tm2">${esc(r.pos)} &middot; ${esc(r.team)}${r.note?" &middot; "+esc(r.note):""}</span></span></div></td><td class="tnum">${num(r.pts,0)}</td><td class="tnum hide-sm">${r.floor==null?"":num(r.floor,0)+"&ndash;"+num(r.ceil,0)}</td><td class="tnum">${num(r.vorp,0)}</td></tr>`).join("")}</tbody></table>`;
     const gl=all.filter(r=>r.grp==="G");
     document.getElementById("dgw").innerHTML=`<table><thead><tr><th>#</th><th class="l">Goalie</th><th>Starts</th><th>W</th><th class="hide-sm">Saves</th><th>SO</th><th>Pts</th><th>VORP</th></tr></thead><tbody>${
-      gl.map((r,i)=>`<tr class="pick ${i%2?"band":""} ${rowCls(r)}" data-key="${esc(r.key)}"><td class="tnum rk">${i+1}</td><td class="l"><div class="tm">${logo(r.team,"sm")}<span>${esc(r.name)}<span class="tm2">${esc(r.team)}</span></span></div></td><td class="tnum">${num(r.gp,0)}</td><td class="tnum">${num(r.wins,0)}</td><td class="tnum hide-sm">${num(r.saves,0)}</td><td class="tnum">${num(r.so,1)}</td><td class="tnum">${num(r.pts,0)}</td><td class="tnum">${num(r.vorp,0)}</td></tr>`).join("")}</tbody></table>`;
-    document.querySelectorAll("tr.pick").forEach(tr=>tr.onclick=()=>toggle(tr));
+      gl.map((r,i)=>`<tr class="drow ${i%2?"band":""} ${rowCls(r)}" data-key="${esc(r.key)}"><td class="tnum rk">${i+1}</td><td class="l"><div class="tm">${logo(r.team,"sm")}<span>${esc(r.name)}<span class="tm2">${esc(r.team)}</span></span></div></td><td class="tnum">${num(r.gp,0)}</td><td class="tnum">${num(r.wins,0)}</td><td class="tnum hide-sm">${num(r.saves,0)}</td><td class="tnum">${num(r.so,1)}</td><td class="tnum">${num(r.pts,0)}</td><td class="tnum">${num(r.vorp,0)}</td></tr>`).join("")}</tbody></table>`;
+    document.querySelectorAll("tr.drow").forEach(tr=>tr.onclick=()=>toggle(tr));
     drawSummary();
   }
   drawDraft();
