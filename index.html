@@ -113,6 +113,7 @@ tr.band td{background:var(--surface-2)}
 .pmini i{display:block;height:100%;background:var(--accent)}
 /* dfs + draft */
 .tm2{color:var(--muted);font-weight:500;font-size:11px;margin-left:6px;white-space:nowrap}
+.onote{display:block;color:var(--tot);font-weight:500;font-size:11px;white-space:normal;line-height:1.25;max-width:220px}   /* override note: its own wrapped line */
 tr.grp td{background:var(--surface-2);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;text-align:left;padding:6px}
 .lurow{display:grid;grid-template-columns:38px 1fr auto auto;gap:8px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--line);font-size:13.5px;font-weight:600}
 .lurow:last-of-type{border-bottom:0}
@@ -397,7 +398,7 @@ function renderDraft(){
     const q=fold(drst.q.trim());
     const flt=all.filter(r=>(drst.pos==="All"||r.grp===drst.pos)&&(!q||fold(r.name).includes(q)||fold(r.team).includes(q)));
     document.getElementById("dtw").innerHTML=`<table><thead><tr><th>#</th><th class="l">Player</th><th>Pts</th><th class="hide-sm">Floor&ndash;ceil</th><th>VORP</th></tr></thead><tbody>${
-      flt.map((r,i)=>`<tr class="drow ${i%2?"band":""} ${rowCls(r)}" data-key="${esc(r.key)}"><td class="tnum rk">${r.n}${r.tier!=null?`<span class="tier">${esc(r.tier)}</span>`:""}</td><td class="l"><div class="tm">${logo(r.team,"sm")}<span>${esc(r.name)}<span class="tm2">${esc(r.pos)} &middot; ${esc(r.team)}${r.note?" &middot; "+esc(r.note):""}</span></span></div></td><td class="tnum">${num(r.pts,0)}</td><td class="tnum hide-sm">${r.floor==null?"":num(r.floor,0)+"&ndash;"+num(r.ceil,0)}</td><td class="tnum">${num(r.vorp,0)}</td></tr>`).join("")}</tbody></table>`;
+      flt.map((r,i)=>`<tr class="drow ${i%2?"band":""} ${rowCls(r)}" data-key="${esc(r.key)}"><td class="tnum rk">${r.n}${r.tier!=null?`<span class="tier">${esc(r.tier)}</span>`:""}</td><td class="l"><div class="tm">${logo(r.team,"sm")}<span>${esc(r.name)}<span class="tm2">${esc(r.pos)} &middot; ${esc(r.team)}</span>${r.note?`<span class="onote">${esc(r.note)}</span>`:""}</span></div></td><td class="tnum">${num(r.pts,0)}</td><td class="tnum hide-sm">${r.floor==null?"":num(r.floor,0)+"&ndash;"+num(r.ceil,0)}</td><td class="tnum">${num(r.vorp,0)}</td></tr>`).join("")}</tbody></table>`;
     const gl=all.filter(r=>r.grp==="G");
     document.getElementById("dgw").innerHTML=`<table><thead><tr><th>#</th><th class="l">Goalie</th><th>Starts</th><th>W</th><th class="hide-sm">Saves</th><th>SO</th><th>Pts</th><th>VORP</th></tr></thead><tbody>${
       gl.map((r,i)=>`<tr class="drow ${i%2?"band":""} ${rowCls(r)}" data-key="${esc(r.key)}"><td class="tnum rk">${i+1}</td><td class="l"><div class="tm">${logo(r.team,"sm")}<span>${esc(r.name)}<span class="tm2">${esc(r.team)}</span></span></div></td><td class="tnum">${num(r.gp,0)}</td><td class="tnum">${num(r.wins,0)}</td><td class="tnum hide-sm">${num(r.saves,0)}</td><td class="tnum">${num(r.so,1)}</td><td class="tnum">${num(r.pts,0)}</td><td class="tnum">${num(r.vorp,0)}</td></tr>`).join("")}</tbody></table>`;
